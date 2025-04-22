@@ -5,5 +5,6 @@ else
   export GF_SERVER_ROOT_URL="http://localhost:3000"
 fi
 echo "server-root-url: $GF_SERVER_ROOT_URL"
+export GF_SERVER_HTTP_PORT=8080
 
 exec /run.sh
