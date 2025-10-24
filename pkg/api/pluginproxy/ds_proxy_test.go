@@ -30,7 +30,7 @@ import (
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/infra/tracing"
 	"github.com/grafana/grafana/pkg/plugins"
-	pluginfakes "github.com/grafana/grafana/pkg/plugins/manager/fakes"
+	"github.com/grafana/grafana/pkg/plugins/manager/pluginfakes"
 	"github.com/grafana/grafana/pkg/services/accesscontrol/acimpl"
 	"github.com/grafana/grafana/pkg/services/accesscontrol/actest"
 	"github.com/grafana/grafana/pkg/services/auth"
@@ -53,6 +53,7 @@ import (
 	"github.com/grafana/grafana/pkg/services/user"
 	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/tests/testsuite"
+	"github.com/grafana/grafana/pkg/util/testutil"
 	"github.com/grafana/grafana/pkg/web"
 )
 
@@ -60,7 +61,9 @@ func TestMain(m *testing.M) {
 	testsuite.Run(m)
 }
 
-func TestDataSourceProxy_routeRule(t *testing.T) {
+func TestIntegrationDataSourceProxy_routeRule(t *testing.T) {
+	testutil.SkipIntegrationTestInShortMode(t)
+
 	cfg := &setting.Cfg{}
 
 	t.Run("Plugin with routes", func(t *testing.T) {
@@ -273,6 +276,14 @@ func TestDataSourceProxy_routeRule(t *testing.T) {
 				require.NoError(t, err)
 				err = proxy.validateRequest()
 				require.NoError(t, err)
+			})
+
+			t.Run("path with slashes and user is editor", func(t *testing.T) {
+				ctx, _ := setUp()
+				proxy, err := setupDSProxyTest(t, ctx, ds, routes, "//api//admin")
+				require.NoError(t, err)
+				err = proxy.validateRequest()
+				require.Error(t, err)
 			})
 		})
 

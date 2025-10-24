@@ -25,12 +25,15 @@ import (
 	"github.com/grafana/grafana/pkg/services/user"
 	"github.com/grafana/grafana/pkg/tests/testinfra"
 	"github.com/grafana/grafana/pkg/util"
+	"github.com/grafana/grafana/pkg/util/testutil"
 )
 
 // Declare respModel at the function level
 var respModel apimodels.UpdateRuleGroupResponse
 
 func TestIntegrationPrometheusRules(t *testing.T) {
+	testutil.SkipIntegrationTestInShortMode(t)
+
 	testinfra.SQLiteIntegrationTest(t)
 
 	dir, path := testinfra.CreateGrafDir(t, testinfra.GrafanaOpts{
@@ -260,6 +263,7 @@ func TestIntegrationPrometheusRules(t *testing.T) {
 					"label1": "val1"
 				},
 				"health": "ok",
+				"isPaused": false,
 				"type": "alerting",
 				"lastEvaluation": "0001-01-01T00:00:00Z",
 				"evaluationTime": 0
@@ -270,6 +274,7 @@ func TestIntegrationPrometheusRules(t *testing.T) {
 				"folderUid": "default",
 				"uid": "%s",
 				"health": "ok",
+				"isPaused": false,
 				"type": "alerting",
 				"lastEvaluation": "0001-01-01T00:00:00Z",
 				"evaluationTime": 0
@@ -323,6 +328,7 @@ func TestIntegrationPrometheusRules(t *testing.T) {
 					"label1": "val1"
 				},
 				"health": "ok",
+				"isPaused": false,
 				"type": "alerting",
 				"lastEvaluation": "0001-01-01T00:00:00Z",
 				"evaluationTime": 0
@@ -333,6 +339,7 @@ func TestIntegrationPrometheusRules(t *testing.T) {
 				"folderUid": "default",
 				"uid": "%s",
 				"health": "ok",
+				"isPaused": false,
 				"type": "alerting",
 				"lastEvaluation": "0001-01-01T00:00:00Z",
 				"evaluationTime": 0
@@ -355,6 +362,8 @@ func TestIntegrationPrometheusRules(t *testing.T) {
 }
 
 func TestIntegrationPrometheusRulesFilterByDashboard(t *testing.T) {
+	testutil.SkipIntegrationTestInShortMode(t)
+
 	testinfra.SQLiteIntegrationTest(t)
 
 	dir, path := testinfra.CreateGrafDir(t, testinfra.GrafanaOpts{
@@ -483,6 +492,7 @@ func TestIntegrationPrometheusRulesFilterByDashboard(t *testing.T) {
 					"__panelId__": "1"
 				},
 				"health": "ok",
+				"isPaused": false,
 				"type": "alerting",
 				"lastEvaluation": "0001-01-01T00:00:00Z",
 				"evaluationTime": 0
@@ -493,6 +503,7 @@ func TestIntegrationPrometheusRulesFilterByDashboard(t *testing.T) {
 				"folderUid": "default",
 				"query": "[{\"refId\":\"A\",\"queryType\":\"\",\"relativeTimeRange\":{\"from\":18000,\"to\":10800},\"datasourceUid\":\"__expr__\",\"model\":{\"expression\":\"2 + 3 \\u003e 1\",\"intervalMs\":1000,\"maxDataPoints\":43200,\"type\":\"math\"}}]",
 				"health": "ok",
+				"isPaused": false,
 				"type": "alerting",
 				"lastEvaluation": "0001-01-01T00:00:00Z",
 				"evaluationTime": 0
@@ -530,6 +541,7 @@ func TestIntegrationPrometheusRulesFilterByDashboard(t *testing.T) {
 					"__panelId__": "1"
 				},
 				"health": "ok",
+				"isPaused": false,
 				"type": "alerting",
 				"lastEvaluation": "0001-01-01T00:00:00Z",
 				"evaluationTime": 0
@@ -683,6 +695,8 @@ func TestIntegrationPrometheusRulesFilterByDashboard(t *testing.T) {
 }
 
 func TestIntegrationPrometheusRulesPermissions(t *testing.T) {
+	testutil.SkipIntegrationTestInShortMode(t)
+
 	testinfra.SQLiteIntegrationTest(t)
 
 	dir, path := testinfra.CreateGrafDir(t, testinfra.GrafanaOpts{

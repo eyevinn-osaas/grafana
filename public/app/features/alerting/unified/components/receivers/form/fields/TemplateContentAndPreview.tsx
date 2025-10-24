@@ -3,12 +3,12 @@ import * as React from 'react';
 import AutoSizer from 'react-virtualized-auto-sizer';
 
 import { GrafanaTheme2 } from '@grafana/data';
+import { t } from '@grafana/i18n';
 import { Box, useStyles2 } from '@grafana/ui';
-import { t } from 'app/core/internationalization';
 import { useAlertmanager } from 'app/features/alerting/unified/state/AlertmanagerContext';
 import { GRAFANA_RULES_SOURCE_NAME } from 'app/features/alerting/unified/utils/datasource';
 
-import { EditorColumnHeader } from '../../../contact-points/templates/EditorColumnHeader';
+import { EditorColumnHeader } from '../../../EditorColumnHeader';
 import { TemplateEditor } from '../../TemplateEditor';
 import { TemplatePreview } from '../../TemplatePreview';
 
@@ -32,6 +32,7 @@ export function TemplateContentAndPreview({
   const styles = useStyles2(getStyles);
 
   const { selectedAlertmanager } = useAlertmanager();
+
   const isGrafanaAlertManager = selectedAlertmanager === GRAFANA_RULES_SOURCE_NAME;
 
   return (

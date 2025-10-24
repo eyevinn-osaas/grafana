@@ -27,6 +27,8 @@ export interface ObjectMeta {
   generation?: number;
   // The first time this was saved
   creationTimestamp: string;
+  // The time this resource was marked for deletion
+  deletionTimestamp?: string;
   // General resource annotations -- including the common grafana.app values
   annotations?: GrafanaAnnotations & GrafanaClientAnnotations;
   // General application level key+value pairs
@@ -36,6 +38,10 @@ export interface ObjectMeta {
 export const AnnoKeyCreatedBy = 'grafana.app/createdBy';
 export const AnnoKeyUpdatedTimestamp = 'grafana.app/updatedTimestamp';
 export const AnnoKeyUpdatedBy = 'grafana.app/updatedBy';
+/**
+ * A name (or uid in old Grafana) of a folder the resource is contained in. Updating this will move the resource to the
+ * new folder.
+ */
 export const AnnoKeyFolder = 'grafana.app/folder';
 export const AnnoKeyMessage = 'grafana.app/message';
 
@@ -48,6 +54,7 @@ export enum ManagerKind {
 
 export const AnnoKeyManagerKind = 'grafana.app/managedBy';
 export const AnnoKeyManagerIdentity = 'grafana.app/managerId';
+export const AnnoKeyManagerAllowsEdits = 'grafana.app/managerAllowsEdits';
 export const AnnoKeySourcePath = 'grafana.app/sourcePath';
 export const AnnoKeySourceChecksum = 'grafana.app/sourceChecksum';
 export const AnnoKeySourceTimestamp = 'grafana.app/sourceTimestamp';
@@ -66,13 +73,16 @@ export const AnnoKeyDashboardIsSnapshot = 'grafana.app/dashboard-is-snapshot';
 export const AnnoKeyDashboardSnapshotOriginalUrl = 'grafana.app/dashboard-snapshot-original-url';
 /** @deprecated NOT A REAL annotation -- this is just a shim */
 export const AnnoKeyDashboardGnetId = 'grafana.app/dashboard-gnet-id';
-
 /** @deprecated NOT A REAL annotation -- this is just a shim */
 export const AnnoKeyFolderTitle = 'grafana.app/folderTitle';
 /** @deprecated NOT A REAL annotation -- this is just a shim */
-export const AnnoKeyFolderId = 'grafana.app/folderId';
-/** @deprecated NOT A REAL annotation -- this is just a shim */
 export const AnnoKeyFolderUrl = 'grafana.app/folderUrl';
+/** @deprecated NOT A REAL annotation -- this is just a shim */
+export const AnnoKeyEmbedded = 'grafana.app/embedded';
+
+/** @experimental only provided by proxies for setup with reloadDashboardsOnParamsChange toggle on */
+/** Not intended to be used in production, we will be removing this in short-term future */
+export const AnnoReloadOnParamsChange = 'grafana.app/reloadOnParamsChange';
 
 // labels
 export const DeprecatedInternalId = 'grafana.app/deprecatedInternalID';
@@ -86,9 +96,14 @@ type GrafanaAnnotations = {
 
   [AnnoKeyManagerKind]?: ManagerKind;
   [AnnoKeyManagerIdentity]?: string;
+  [AnnoKeyManagerAllowsEdits]?: string;
   [AnnoKeySourcePath]?: string;
   [AnnoKeySourceChecksum]?: string;
   [AnnoKeySourceTimestamp]?: string;
+
+  /** @experimental only provided by proxies for setup with reloadDashboardsOnParamsChange toggle on */
+  /** Not intended to be used in production, we will be removing this in short-term future */
+  [AnnoReloadOnParamsChange]?: boolean;
 };
 
 // Annotations provided by the front-end client
@@ -98,11 +113,11 @@ type GrafanaClientAnnotations = {
   [AnnoKeySlug]?: string;
   [AnnoKeyFolderTitle]?: string;
   [AnnoKeyFolderUrl]?: string;
-  [AnnoKeyFolderId]?: number;
-  [AnnoKeyFolderId]?: number;
   [AnnoKeySavedFromUI]?: string;
-  [AnnoKeyDashboardIsSnapshot]?: boolean;
+  [AnnoKeyDashboardIsSnapshot]?: string;
   [AnnoKeyDashboardSnapshotOriginalUrl]?: string;
+  [AnnoKeyEmbedded]?: string;
+
   [AnnoKeyGrantPermissions]?: string;
   // TODO: This should be provided by the API
   // This is the dashboard ID for the Gcom API. This set when a dashboard is created through importing a dashboard from Grafana.com.
@@ -258,4 +273,19 @@ export interface K8sAPIGroup {
 export interface K8sAPIGroupList {
   kind: 'APIGroupList';
   groups: K8sAPIGroup[];
+}
+
+/**
+ * Generic types to match the generated k8s API types in the RTK query clients
+ */
+export interface GeneratedObjectMeta extends Partial<ObjectMeta> {}
+export interface GeneratedResource<T = object, S = object, K = string> extends Partial<TypeMeta<K>> {
+  metadata?: GeneratedObjectMeta;
+  spec?: T;
+  status?: S;
+}
+
+export interface GeneratedResourceList<Spec, Status, K = string> {
+  metadata?: Partial<ListMeta>;
+  items?: Array<GeneratedResource<Spec, Status, K>>;
 }

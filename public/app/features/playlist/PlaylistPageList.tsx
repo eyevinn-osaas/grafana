@@ -4,7 +4,7 @@ import { GrafanaTheme2 } from '@grafana/data';
 import { useStyles2 } from '@grafana/ui';
 import { SkeletonComponent, attachSkeleton } from '@grafana/ui/unstable';
 
-import { Playlist } from '../../api/clients/playlist';
+import { Playlist } from '../../api/clients/playlist/v0alpha1';
 
 import { PlaylistCard } from './PlaylistCard';
 
@@ -19,7 +19,7 @@ const PlaylistPageListComponent = ({ playlists, setStartPlaylist, setPlaylistToD
   return (
     <ul className={styles.list}>
       {playlists.map((playlist) => (
-        <li className={styles.listItem} key={playlist.metadata.name}>
+        <li className={styles.listItem} key={playlist.metadata?.name}>
           <PlaylistCard
             playlist={playlist}
             setStartPlaylist={setStartPlaylist}
@@ -48,6 +48,7 @@ function getStyles(theme: GrafanaTheme2) {
   return {
     list: css({
       display: 'grid',
+      gap: theme.spacing(1),
     }),
     listItem: css({
       listStyle: 'none',

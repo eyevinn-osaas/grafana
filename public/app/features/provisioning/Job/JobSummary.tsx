@@ -1,5 +1,5 @@
 import { InteractiveTable, Stack } from '@grafana/ui';
-import { JobResourceSummary } from 'app/api/clients/provisioning';
+import { JobResourceSummary } from 'app/api/clients/provisioning/v0alpha1';
 
 type SummaryCell<T extends keyof JobResourceSummary = keyof JobResourceSummary> = {
   row: {
@@ -11,7 +11,7 @@ const getSummaryColumns = () => [
   {
     id: 'resource',
     header: 'Resource',
-    cell: ({ row: { original: item } }: SummaryCell) => item.resource,
+    cell: ({ row: { original: item } }: SummaryCell) => item.kind,
   },
   {
     id: 'created',
@@ -58,7 +58,7 @@ export function JobSummary({ summary }: Props) {
       <InteractiveTable
         data={summary}
         columns={getSummaryColumns()}
-        getRowId={(item) => item.resource || ''}
+        getRowId={(item) => item.kind || ''}
         pageSize={10}
       />
     </Stack>

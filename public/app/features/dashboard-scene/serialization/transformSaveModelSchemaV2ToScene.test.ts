@@ -13,23 +13,24 @@ import {
   GroupByVariable,
   AdHocFiltersVariable,
   SceneDataTransformer,
-  SceneGridRow,
   SceneGridItem,
 } from '@grafana/scenes';
-import { handyTestingSchema } from '@grafana/schema/dist/esm/schema/dashboard/v2_examples';
 import {
   AdhocVariableKind,
   ConstantVariableKind,
   CustomVariableKind,
   Spec as DashboardV2Spec,
   DatasourceVariableKind,
+  defaultDataQueryKind,
   GridLayoutItemSpec,
   GridLayoutSpec,
   GroupByVariableKind,
   IntervalVariableKind,
   QueryVariableKind,
   TextVariableKind,
-} from '@grafana/schema/dist/esm/schema/dashboard/v2alpha1/types.spec.gen';
+} from '@grafana/schema/dist/esm/schema/dashboard/v2';
+import { handyTestingSchema } from '@grafana/schema/dist/esm/schema/dashboard/v2_examples';
+import { AnnoKeyDashboardIsSnapshot } from 'app/features/apiserver/types';
 import { DashboardWithAccessInfo } from 'app/features/dashboard/api/types';
 import { MIXED_DATASOURCE_NAME } from 'app/plugins/datasource/mixed/MixedDataSource';
 
@@ -138,6 +139,7 @@ describe('transformSaveModelSchemaV2ToScene', () => {
     // Variables
     const variables = scene.state?.$variables;
     expect(variables?.state.variables).toHaveLength(dash.variables.length);
+
     validateVariable({
       sceneVariable: variables?.state.variables[0],
       variableKind: dash.variables[0] as QueryVariableKind,
@@ -228,14 +230,14 @@ describe('transformSaveModelSchemaV2ToScene', () => {
 
     // VizPanel
     const vizPanels = (scene.state.body as DashboardLayoutManager).getVizPanels();
-    expect(vizPanels).toHaveLength(3);
+    expect(vizPanels).toHaveLength(2);
 
     // Layout
     const layout = scene.state.body as DefaultGridLayoutManager;
 
     // Panel
     const panel = getPanelElement(dash, 'panel-1')!;
-    expect(layout.state.grid.state.children.length).toBe(3);
+    expect(layout.state.grid.state.children.length).toBe(2);
     expect(layout.state.grid.state.children[0].state.key).toBe(`grid-item-${panel.spec.id}`);
     const gridLayoutItemSpec = (dash.layout.spec as GridLayoutSpec).items[0].spec as GridLayoutItemSpec;
     expect(layout.state.grid.state.children[0].state.width).toBe(gridLayoutItemSpec.width);
@@ -256,9 +258,6 @@ describe('transformSaveModelSchemaV2ToScene', () => {
     const vizLibraryPanel = vizPanels.find((p) => p.state.key === 'panel-2')!;
     validateVizPanel(vizLibraryPanel, dash);
 
-    expect((layout.state.grid.state.children[2] as SceneGridRow).state.isCollapsed).toBe(false);
-    expect((layout.state.grid.state.children[2] as SceneGridRow).state.y).toBe(20);
-
     // Transformations
     const panelWithTransformations = vizPanels.find((p) => p.state.key === 'panel-1')!;
     expect((panelWithTransformations.state.$data as SceneDataTransformer)?.state.transformations[0]).toEqual(
@@ -272,13 +271,14 @@ describe('transformSaveModelSchemaV2ToScene', () => {
       kind: 'PanelQuery',
       spec: {
         refId: 'A',
-        datasource: {
-          type: 'graphite',
-          uid: 'datasource1',
-        },
         hidden: false,
         query: {
-          kind: 'prometheus',
+          kind: 'DataQuery',
+          version: defaultDataQueryKind().version,
+          group: 'graphite',
+          datasource: {
+            name: 'datasource1',
+          },
           spec: {
             expr: 'test-query',
           },
@@ -289,7 +289,7 @@ describe('transformSaveModelSchemaV2ToScene', () => {
     const scene = transformSaveModelSchemaV2ToScene(dashboard);
 
     const vizPanels = (scene.state.body as DashboardLayoutManager).getVizPanels();
-    expect(vizPanels.length).toBe(3);
+    expect(vizPanels.length).toBe(2);
     expect(getQueryRunnerFor(vizPanels[0])?.state.datasource?.type).toBe('mixed');
     expect(getQueryRunnerFor(vizPanels[0])?.state.datasource?.uid).toBe(MIXED_DATASOURCE_NAME);
   });
@@ -300,13 +300,14 @@ describe('transformSaveModelSchemaV2ToScene', () => {
       kind: 'PanelQuery',
       spec: {
         refId: 'A',
-        datasource: {
-          type: 'prometheus',
-          uid: 'datasource1',
-        },
         hidden: false,
         query: {
-          kind: 'prometheus',
+          kind: 'DataQuery',
+          version: defaultDataQueryKind().version,
+          group: 'prometheus',
+          datasource: {
+            name: 'datasource1',
+          },
           spec: {
             expr: 'test-query',
           },
@@ -317,7 +318,7 @@ describe('transformSaveModelSchemaV2ToScene', () => {
     const scene = transformSaveModelSchemaV2ToScene(dashboard);
 
     const vizPanels = (scene.state.body as DashboardLayoutManager).getVizPanels();
-    expect(vizPanels.length).toBe(3);
+    expect(vizPanels.length).toBe(2);
     expect(getQueryRunnerFor(vizPanels[0])?.state.queries[0].datasource).toEqual({
       type: 'prometheus',
       uid: 'datasource1',
@@ -333,7 +334,12 @@ describe('transformSaveModelSchemaV2ToScene', () => {
         refId: 'A',
         hidden: false,
         query: {
-          kind: 'prometheus',
+          kind: 'DataQuery',
+          version: defaultDataQueryKind().version,
+          group: 'prometheus',
+          datasource: {
+            name: 'abc123',
+          },
           spec: {
             expr: 'test-query',
           },
@@ -344,7 +350,7 @@ describe('transformSaveModelSchemaV2ToScene', () => {
     const scene = transformSaveModelSchemaV2ToScene(dashboard);
 
     const vizPanels = (scene.state.body as DashboardLayoutManager).getVizPanels();
-    expect(vizPanels.length).toBe(3);
+    expect(vizPanels.length).toBe(2);
     expect(getQueryRunnerFor(vizPanels[0])?.state.datasource?.type).toBe('mixed');
     expect(getQueryRunnerFor(vizPanels[0])?.state.datasource?.uid).toBe(MIXED_DATASOURCE_NAME);
   });
@@ -357,7 +363,7 @@ describe('transformSaveModelSchemaV2ToScene', () => {
           ...defaultDashboard.metadata,
           annotations: {
             ...defaultDashboard.metadata.annotations,
-            'grafana.app/dashboard-is-snapshot': true,
+            [AnnoKeyDashboardIsSnapshot]: 'true',
           },
         },
       };
@@ -668,11 +674,11 @@ describe('transformSaveModelSchemaV2ToScene', () => {
   });
 
   describe('annotations', () => {
-    it('should transform annotation with options field', () => {
+    it('should transform annotation with legacyOptions field', () => {
       // Create a dashboard with an annotation that has options
       const dashboardWithAnnotationOptions: DashboardWithAccessInfo<DashboardV2Spec> = {
         kind: 'DashboardWithAccessInfo',
-        apiVersion: 'v2alpha1',
+        apiVersion: 'v2beta1',
         metadata: {
           name: 'test-dashboard',
           namespace: 'default',
@@ -710,21 +716,26 @@ describe('transformSaveModelSchemaV2ToScene', () => {
             {
               kind: 'AnnotationQuery',
               spec: {
-                name: 'Annotation with options',
+                name: 'Annotation with legacy options',
                 builtIn: false,
                 enable: true,
                 hide: false,
                 iconColor: 'purple',
-                datasource: {
-                  type: 'prometheus',
-                  uid: 'abc123',
-                },
-                options: {
+                legacyOptions: {
                   expr: 'rate(http_requests_total[5m])',
                   queryType: 'range',
                   legendFormat: '{{method}} {{endpoint}}',
                   useValueAsTime: true,
                   step: '1m',
+                },
+                query: {
+                  kind: 'DataQuery',
+                  version: defaultDataQueryKind().version,
+                  group: 'prometheus',
+                  datasource: {
+                    name: 'abc123',
+                  },
+                  spec: {},
                 },
               },
             },
@@ -757,22 +768,35 @@ describe('transformSaveModelSchemaV2ToScene', () => {
       // Get the annotation layers
       const dataLayerSet = scene.state.$data as DashboardDataLayerSet;
       expect(dataLayerSet).toBeDefined();
-      expect(dataLayerSet.state.annotationLayers.length).toBe(1);
+      expect(dataLayerSet.state.annotationLayers.length).toBe(2);
+      const defaultAnnotationLayer = dataLayerSet.state.annotationLayers[0] as DashboardAnnotationsDataLayer;
 
-      const annotationLayer = dataLayerSet.state.annotationLayers[0] as DashboardAnnotationsDataLayer;
-
-      // Verify that the options have been merged into the query object
-      expect(annotationLayer.state.query).toMatchObject({
-        name: 'Annotation with options',
-        expr: 'rate(http_requests_total[5m])',
-        queryType: 'range',
-        legendFormat: '{{method}} {{endpoint}}',
-        useValueAsTime: true,
-        step: '1m',
+      // Verify that the default annotation layer has been correctly initialized
+      expect(defaultAnnotationLayer.state.query).toEqual({
+        datasource: {
+          uid: '-- Grafana --',
+          type: 'grafana',
+        },
+        builtIn: 1,
+        enable: true,
+        iconColor: 'rgba(0, 211, 255, 1)',
+        name: 'Annotations & Alerts',
+        hide: true,
+        type: 'dashboard',
       });
 
-      // Verify the original options object is also preserved
-      expect(annotationLayer.state.query.options).toMatchObject({
+      const annotationLayer = dataLayerSet.state.annotationLayers[1] as DashboardAnnotationsDataLayer;
+
+      // Verify that the legacyOptions have been merged into the query object
+      expect(annotationLayer.state.query).toMatchObject({
+        datasource: {
+          uid: 'abc123',
+          type: 'prometheus',
+        },
+        name: 'Annotation with legacy options',
+        enable: true,
+        hide: false,
+        iconColor: 'purple',
         expr: 'rate(http_requests_total[5m])',
         queryType: 'range',
         legendFormat: '{{method}} {{endpoint}}',

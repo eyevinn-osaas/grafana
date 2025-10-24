@@ -12,13 +12,13 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/tracing"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/grafana/grafana/pkg/tsdb/grafana-testdata-datasource/kinds"
 )
 
@@ -111,6 +111,12 @@ Timestamps will line up evenly on timeStepSeconds (For example, 60 seconds means
 	})
 
 	s.registerScenario(&Scenario{
+		ID:      kinds.TestDataQueryTypeSteps,
+		Name:    "Steps",
+		handler: s.handleClientSideScenario,
+	})
+
+	s.registerScenario(&Scenario{
 		ID:      kinds.TestDataQueryTypeSimulation,
 		Name:    "Simulation",
 		handler: s.sims.QueryData,
@@ -150,6 +156,12 @@ Timestamps will line up evenly on timeStepSeconds (For example, 60 seconds means
 		ID:      kinds.TestDataQueryTypeRandomWalkWithError,
 		Name:    "Random Walk (with error)",
 		handler: s.handleRandomWalkWithErrorScenario,
+	})
+
+	s.registerScenario(&Scenario{
+		ID:      kinds.TestDataQueryTypeQueryMeta,
+		Name:    "Query Metadata",
+		handler: s.handleQueryMetaScenario,
 	})
 
 	s.registerScenario(&Scenario{
@@ -381,6 +393,31 @@ func (s *Service) handleCSVMetricValuesScenario(ctx context.Context, req *backen
 		resp.Responses[q.RefID] = respD
 	}
 
+	return resp, nil
+}
+
+func (s *Service) handleQueryMetaScenario(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
+	resp := backend.NewQueryDataResponse()
+
+	if len(req.Queries) == 0 {
+		return nil, errors.New("no queries")
+	}
+
+	refId := req.Queries[0].RefID
+
+	username := req.PluginContext.User.Name
+
+	keys := []string{"username"}
+	values := []string{username}
+
+	frame := data.NewFrame("",
+		data.NewField("keys", nil, keys),
+		data.NewField("values", nil, values),
+	)
+	r := backend.DataResponse{}
+	r.Frames = data.Frames{frame}
+
+	resp.Responses[refId] = r
 	return resp, nil
 }
 
@@ -890,6 +927,7 @@ func predictableCSVWave(query backend.DataQuery, model kinds.TestDataQuery) ([]*
 		if subQ.Name != "" {
 			frame.Name = subQ.Name
 		}
+		setFrameType(frame, data.FrameTypeTimeSeriesMulti, data.FrameTypeVersion{0, 0})
 		frames = append(frames, frame)
 	}
 	return frames, nil
@@ -967,6 +1005,7 @@ func predictablePulse(query backend.DataQuery, model kinds.TestDataQuery) (*data
 	frame := newSeriesForQuery(query, model, 0)
 	frame.Fields = fields
 	frame.Fields[1].Labels = parseLabels(model, 0)
+	setFrameType(frame, data.FrameTypeTimeSeriesMulti, data.FrameTypeVersion{0, 0})
 
 	return frame, nil
 }

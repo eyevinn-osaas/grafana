@@ -5,10 +5,10 @@ import { useLocation } from 'react-router-dom-v5-compat';
 import { useLocalStorage } from 'react-use';
 
 import { FeatureState, GrafanaTheme2, NavModelItem, toIconName } from '@grafana/data';
+import { t } from '@grafana/i18n';
 import { useStyles2, Text, IconButton, Icon, Stack, FeatureBadge } from '@grafana/ui';
 import { useGrafana } from 'app/core/context/GrafanaContext';
 
-import { t } from '../../../internationalization';
 import { Indent } from '../../Indent/Indent';
 
 import { FeatureHighlight } from './FeatureHighlight';
@@ -175,7 +175,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
   menuItem: css({
     display: 'flex',
     alignItems: 'center',
-    gap: theme.spacing(1),
+    gap: theme.spacing(0.5),
     height: theme.spacing(4),
     paddingLeft: theme.spacing(0.5),
     position: 'relative',
@@ -221,6 +221,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
   }),
   labelWrapperWithIcon: css({
     paddingLeft: theme.spacing(0.5),
+    gap: theme.spacing(0.5),
   }),
   hasActiveChild: css({
     color: theme.colors.text.primary,

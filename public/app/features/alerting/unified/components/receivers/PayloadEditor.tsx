@@ -4,11 +4,11 @@ import * as React from 'react';
 import AutoSizer from 'react-virtualized-auto-sizer';
 
 import { GrafanaTheme2 } from '@grafana/data';
+import { Trans, t } from '@grafana/i18n';
 import { Button, CodeEditor, Dropdown, Menu, Stack, Toggletip, useStyles2 } from '@grafana/ui';
-import { Trans, t } from 'app/core/internationalization';
 import { TestTemplateAlert } from 'app/plugins/datasource/alertmanager/types';
 
-import { EditorColumnHeader } from '../contact-points/templates/EditorColumnHeader';
+import { EditorColumnHeader } from '../EditorColumnHeader';
 
 import { AlertInstanceModalSelector } from './AlertInstanceModalSelector';
 import { AlertTemplatePreviewData } from './TemplateData';

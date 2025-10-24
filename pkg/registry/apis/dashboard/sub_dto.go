@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/rest"
 
-	claims "github.com/grafana/authlib/types"
+	authlib "github.com/grafana/authlib/types"
 	"github.com/grafana/grafana-app-sdk/logging"
 	"github.com/grafana/grafana/apps/dashboard/pkg/apis/dashboard"
 	"github.com/grafana/grafana/pkg/apimachinery/identity"
@@ -21,6 +21,7 @@ import (
 	"github.com/grafana/grafana/pkg/services/dashboards"
 	"github.com/grafana/grafana/pkg/storage/unified/apistore"
 	"github.com/grafana/grafana/pkg/storage/unified/resource"
+	"github.com/grafana/grafana/pkg/storage/unified/resourcepb"
 )
 
 type dtoBuilder = func(dashboard runtime.Object, access *dashboard.DashboardAccess) (runtime.Object, error)
@@ -109,7 +110,7 @@ func (r *DTOConnector) Connect(ctx context.Context, name string, opts runtime.Ob
 	blobInfo := obj.GetBlob()
 	if blobInfo != nil && r.largeObjects != nil {
 		gr := r.largeObjects.GroupResource()
-		err = r.largeObjects.Reconstruct(ctx, &resource.ResourceKey{
+		err = r.largeObjects.Reconstruct(ctx, &resourcepb.ResourceKey{
 			Group:     gr.Group,
 			Resource:  gr.Resource,
 			Namespace: obj.GetNamespace(),
@@ -143,14 +144,12 @@ func (r *DTOConnector) Connect(ctx context.Context, name string, opts runtime.Ob
 		access.CanAdmin, _ = r.accessControl.Evaluate(ctx, user, adminEvaluator)
 		deleteEvaluator := accesscontrol.EvalPermission(dashboards.ActionDashboardsDelete, dashScope)
 		access.CanDelete, _ = r.accessControl.Evaluate(ctx, user, deleteEvaluator)
-		access.CanStar = user.IsIdentityType(claims.TypeUser)
+		access.CanStar = user.IsIdentityType(authlib.TypeUser)
 
 		access.AnnotationsPermissions = &dashboard.AnnotationPermission{}
 		r.getAnnotationPermissionsByScope(ctx, user, &access.AnnotationsPermissions.Dashboard, accesscontrol.ScopeAnnotationsTypeDashboard)
 		r.getAnnotationPermissionsByScope(ctx, user, &access.AnnotationsPermissions.Organization, accesscontrol.ScopeAnnotationsTypeOrganization)
 
-		// FIXME!!!! does not get the title!
-		// The title property next to unstructured and not found in this model
 		title := obj.FindTitle("")
 		access.Slug = slugify.Slugify(title)
 		access.Url = dashboards.GetDashboardFolderURL(false, name, access.Slug)

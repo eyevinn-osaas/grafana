@@ -8,10 +8,10 @@ import {
   urlUtil,
   serializeStateToUrlParam,
 } from '@grafana/data';
+import { t } from '@grafana/i18n';
 import { getDataSourceSrv } from '@grafana/runtime';
 import { notifyApp } from 'app/core/actions';
 import { createErrorNotification, createWarningNotification } from 'app/core/copy/appNotification';
-import { t } from 'app/core/internationalization';
 import { dispatch } from 'app/store/store';
 import { RichHistoryQuery } from 'app/types/explore';
 
@@ -31,8 +31,6 @@ import {
   RichHistorySettings,
   SortOrder,
 } from './richHistoryTypes';
-
-export { type RichHistorySearchFilters, type RichHistorySettings, SortOrder };
 
 /*
  * Add queries to rich history. Save only queries within the retention period, or that are starred.
@@ -202,8 +200,8 @@ export const createUrlFromRichHistory = (query: RichHistoryQuery) => {
   const exploreState: ExploreUrlState = {
     /* Default range, as we are not saving timerange in rich history */
     range: {
-      from: t('explore.rich-history-utils.default-from', 'now-1h'),
-      to: t('explore.rich-history-utils.default-to', 'now'),
+      from: 'now-1h',
+      to: 'now',
     },
     datasource: query.datasourceName,
     queries: query.queries,

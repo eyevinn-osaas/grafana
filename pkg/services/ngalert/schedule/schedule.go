@@ -13,13 +13,14 @@ import (
 
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/infra/tracing"
+	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/services/ngalert/api/tooling/definitions"
 	"github.com/grafana/grafana/pkg/services/ngalert/eval"
 	"github.com/grafana/grafana/pkg/services/ngalert/metrics"
 	ngmodels "github.com/grafana/grafana/pkg/services/ngalert/models"
+	"github.com/grafana/grafana/pkg/services/ngalert/schedule/ticker"
 	"github.com/grafana/grafana/pkg/services/ngalert/state"
 	"github.com/grafana/grafana/pkg/setting"
-	"github.com/grafana/grafana/pkg/util/ticker"
 )
 
 // ScheduleService is an interface for a service that schedules the evaluation
@@ -29,9 +30,6 @@ type ScheduleService interface {
 	// an error. The scheduler is terminated when this function returns.
 	Run(context.Context) error
 }
-
-// retryDelay represents how long to wait between each failed rule evaluation.
-const retryDelay = 1 * time.Second
 
 // AlertsSender is an interface for a service that is responsible for sending notifications to the end-user.
 //
@@ -66,7 +64,7 @@ type schedule struct {
 	// each rule gets its own channel and routine
 	registry ruleRegistry
 
-	maxAttempts int64
+	retryConfig RetryConfig
 
 	clock clock.Clock
 
@@ -106,14 +104,22 @@ type schedule struct {
 	// last evaluated.
 	schedulableAlertRules alertRulesRegistry
 
-	tracer tracing.Tracer
-
+	tracer          tracing.Tracer
+	featureToggles  featuremgmt.FeatureToggles
 	recordingWriter RecordingWriter
+}
+
+// RetryConfig configures the exponential backoff for alert rule and recording rule evaluations.
+type RetryConfig struct {
+	MaxAttempts         int64
+	InitialRetryDelay   time.Duration
+	MaxRetryDelay       time.Duration
+	RandomizationFactor float64
 }
 
 // SchedulerCfg is the scheduler configuration.
 type SchedulerCfg struct {
-	MaxAttempts            int64
+	RetryConfig            RetryConfig
 	BaseInterval           time.Duration
 	C                      clock.Clock
 	MinRuleInterval        time.Duration
@@ -129,19 +135,20 @@ type SchedulerCfg struct {
 	Log                    log.Logger
 	RecordingWriter        RecordingWriter
 	RuleStopReasonProvider AlertRuleStopReasonProvider
+	FeatureToggles         featuremgmt.FeatureToggles
 }
 
 // NewScheduler returns a new scheduler.
 func NewScheduler(cfg SchedulerCfg, stateManager *state.Manager) *schedule {
 	const minMaxAttempts = int64(1)
-	if cfg.MaxAttempts < minMaxAttempts {
-		cfg.Log.Warn("Invalid scheduler maxAttempts, using a safe minimum", "configured", cfg.MaxAttempts, "actual", minMaxAttempts)
-		cfg.MaxAttempts = minMaxAttempts
+	if cfg.RetryConfig.MaxAttempts < minMaxAttempts {
+		cfg.Log.Warn("Invalid scheduler maxAttempts, using a safe minimum", "configured", cfg.RetryConfig.MaxAttempts, "actual", minMaxAttempts)
+		cfg.RetryConfig.MaxAttempts = minMaxAttempts
 	}
 
 	sch := schedule{
 		registry:               newRuleRegistry(),
-		maxAttempts:            cfg.MaxAttempts,
+		retryConfig:            cfg.RetryConfig,
 		clock:                  cfg.C,
 		baseInterval:           cfg.BaseInterval,
 		log:                    cfg.Log,
@@ -159,14 +166,15 @@ func NewScheduler(cfg SchedulerCfg, stateManager *state.Manager) *schedule {
 		tracer:                 cfg.Tracer,
 		recordingWriter:        cfg.RecordingWriter,
 		ruleStopReasonProvider: cfg.RuleStopReasonProvider,
+		featureToggles:         cfg.FeatureToggles,
 	}
 
 	return &sch
 }
 
 func (sch *schedule) Run(ctx context.Context) error {
-	sch.log.Info("Starting scheduler", "tickInterval", sch.baseInterval, "maxAttempts", sch.maxAttempts)
-	t := ticker.New(sch.clock, sch.baseInterval, sch.metrics.Ticker)
+	sch.log.Info("Starting scheduler", "tickInterval", sch.baseInterval, "maxAttempts", sch.retryConfig.MaxAttempts)
+	t := ticker.New(sch.clock, sch.baseInterval, sch.metrics.Ticker, sch.log)
 	defer t.Stop()
 
 	if err := sch.schedulePeriodic(ctx, t); err != nil {
@@ -293,10 +301,11 @@ func (sch *schedule) processTick(ctx context.Context, dispatcherGroup *errgroup.
 	updatedRules := make([]ngmodels.AlertRuleKeyWithVersion, 0, len(updated)) // this is needed for tests only
 	restartedRules := make([]Rule, 0)
 	missingFolder := make(map[string][]string)
+
 	ruleFactory := newRuleFactory(
 		sch.appURL,
 		sch.disableGrafanaFolder,
-		sch.maxAttempts,
+		sch.retryConfig,
 		sch.alertsSender,
 		sch.stateManager,
 		sch.evaluatorFactory,
@@ -305,6 +314,7 @@ func (sch *schedule) processTick(ctx context.Context, dispatcherGroup *errgroup.
 		sch.metrics,
 		sch.log,
 		sch.tracer,
+		sch.featureToggles,
 		sch.recordingWriter,
 		sch.evalAppliedFunc,
 		sch.stopAppliedFunc,

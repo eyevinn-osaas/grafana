@@ -1,3 +1,4 @@
+import { ObjectMatcher } from 'app/plugins/datasource/alertmanager/types';
 import { RuleGroupIdentifierV2, RuleIdentifier } from 'app/types/unified-alerting';
 
 import { createReturnTo } from '../hooks/useReturnTo';
@@ -45,15 +46,56 @@ export const groups = {
       { skipSubPath: options?.skipSubPath }
     );
   },
+  newAlertRuleLink: (folderName?: string, folderUid?: string, groupName?: string) => {
+    const returnTo = createReturnTo();
+
+    const defaults = JSON.stringify({
+      folder: {
+        title: folderName,
+        uid: folderUid,
+      },
+      group: groupName,
+    });
+
+    return createRelativeUrl('/alerting/new', { defaults, returnTo });
+  },
+  newRecordingRuleLink: (folderName?: string, folderUid?: string, groupName?: string) => {
+    const returnTo = createReturnTo();
+
+    const defaults = JSON.stringify({
+      folder: {
+        title: folderName,
+        uid: folderUid,
+      },
+      group: groupName,
+    });
+
+    return createRelativeUrl('/alerting/new/grafana-recording', { defaults, returnTo });
+  },
 };
 
 export const rulesNav = {
   /**
    * Creates a link to the details page of a rule. Encodes the rules source name and rule identifier.
    */
-  detailsPageLink: (rulesSourceName: string, ruleIdentifier: RuleIdentifier, params?: QueryParams) =>
+  detailsPageLink: (
+    rulesSourceName: string,
+    ruleIdentifier: RuleIdentifier,
+    params?: QueryParams,
+    options?: { skipSubPath?: boolean }
+  ) =>
     createRelativeUrl(
       `/alerting/${encodeURIComponent(rulesSourceName)}/${encodeURIComponent(stringifyIdentifier(ruleIdentifier))}/view`,
-      params
+      params,
+      { skipSubPath: options?.skipSubPath }
     ),
+};
+
+export const notificationPolicies = {
+  viewLink: (matchers: ObjectMatcher[], alertmanagerSourceName?: string) => {
+    return createRelativeUrl('/alerting/routes', {
+      queryString: matchers.map((matcher) => matcher.join('')).join(','),
+      alertmanager: alertmanagerSourceName ?? 'grafana',
+    });
+  },
 };

@@ -9,15 +9,17 @@ import { contextSrv } from 'app/core/services/context_srv';
 import LdapPage from 'app/features/admin/ldap/LdapPage';
 import { getAlertingRoutes } from 'app/features/alerting/routes';
 import { isAdmin, isLocalDevEnv, isOpenSourceEdition } from 'app/features/alerting/unified/utils/misc';
-import { ConnectionsRedirectNotice } from 'app/features/connections/components/ConnectionsRedirectNotice';
+import { ConnectionsRedirectNotice } from 'app/features/connections/components/ConnectionsRedirectNotice/ConnectionsRedirectNotice';
 import { ROUTES as CONNECTIONS_ROUTES } from 'app/features/connections/constants';
 import { getRoutes as getDataConnectionsRoutes } from 'app/features/connections/routes';
+import { DASHBOARD_LIBRARY_ROUTES } from 'app/features/dashboard/dashgrid/types';
 import { DATASOURCES_ROUTES } from 'app/features/datasources/constants';
 import { ConfigureIRM } from 'app/features/gops/configuration-tracker/components/ConfigureIRM';
 import { getRoutes as getPluginCatalogRoutes } from 'app/features/plugins/admin/routes';
 import { getAppPluginRoutes } from 'app/features/plugins/routes';
 import { getProfileRoutes } from 'app/features/profile/routes';
-import { AccessControlAction, DashboardRoutes } from 'app/types';
+import { AccessControlAction } from 'app/types/accessControl';
+import { DashboardRoutes } from 'app/types/dashboard';
 
 import { SafeDynamicImport } from '../core/components/DynamicImports/SafeDynamicImport';
 import { RouteDescriptor } from '../core/navigation/types';
@@ -62,6 +64,15 @@ export function getAppRoutes(): RouteDescriptor[] {
       roles: () => contextSrv.evaluatePermission([AccessControlAction.DashboardsCreate]),
       component: SafeDynamicImport(
         () => import(/* webpackChunkName: "DashboardPage" */ '../features/dashboard/containers/NewDashboardWithDS')
+      ),
+    },
+    {
+      path: DASHBOARD_LIBRARY_ROUTES.Template,
+      roles: () => contextSrv.evaluatePermission([AccessControlAction.DashboardsCreate]),
+      pageClass: 'page-dashboard',
+      routeName: DashboardRoutes.Template,
+      component: SafeDynamicImport(
+        () => import(/* webpackChunkName: "DashboardPage" */ '../features/dashboard/containers/DashboardPageProxy')
       ),
     },
     {
@@ -187,8 +198,16 @@ export function getAppRoutes(): RouteDescriptor[] {
       component: () => <NavLandingPage navId="testing-and-synthetics" />,
     },
     {
+      path: '/adaptive-telemetry',
+      component: () => <NavLandingPage navId="adaptive-telemetry" />,
+    },
+    {
       path: '/monitoring',
-      component: () => <NavLandingPage navId="monitoring" />,
+      component: () => <Navigate replace to="/observability" />,
+    },
+    {
+      path: '/observability',
+      component: () => <NavLandingPage navId="observability" />,
     },
     {
       path: '/infrastructure',
@@ -245,13 +264,6 @@ export function getAppRoutes(): RouteDescriptor[] {
       ),
     },
     {
-      path: '/org/apikeys',
-      roles: () => contextSrv.evaluatePermission([AccessControlAction.ActionAPIKeysRead]),
-      component: SafeDynamicImport(
-        () => import(/* webpackChunkName: "ApiKeysPage" */ 'app/features/api-keys/ApiKeysPage')
-      ),
-    },
-    {
       path: '/org/serviceaccounts',
       roles: () =>
         contextSrv.evaluatePermission([
@@ -303,13 +315,9 @@ export function getAppRoutes(): RouteDescriptor[] {
     {
       path: '/admin/authentication',
       roles: () => contextSrv.evaluatePermission([AccessControlAction.SettingsWrite]),
-      component:
-        config.licenseInfo.enabledFeatures?.saml || config.ldapEnabled || config.featureToggles.ssoSettingsApi
-          ? SafeDynamicImport(
-              () =>
-                import(/* webpackChunkName: "AdminAuthentication" */ '../features/auth-config/AuthProvidersListPage')
-            )
-          : () => <Navigate replace to="/admin" />,
+      component: SafeDynamicImport(
+        () => import(/* webpackChunkName: "AdminAuthentication" */ '../features/auth-config/AuthProvidersListPage')
+      ),
     },
     {
       path: '/admin/authentication/ldap',
@@ -322,11 +330,9 @@ export function getAppRoutes(): RouteDescriptor[] {
     {
       path: '/admin/authentication/:provider',
       roles: () => contextSrv.evaluatePermission([AccessControlAction.SettingsWrite]),
-      component: config.featureToggles.ssoSettingsApi
-        ? SafeDynamicImport(
-            () => import(/* webpackChunkName: "AdminAuthentication" */ '../features/auth-config/ProviderConfigPage')
-          )
-        : () => <Navigate replace to="/admin" />,
+      component: SafeDynamicImport(
+        () => import(/* webpackChunkName: "AdminAuthentication" */ '../features/auth-config/ProviderConfigPage')
+      ),
     },
     {
       path: '/admin/settings',
@@ -369,14 +375,6 @@ export function getAppRoutes(): RouteDescriptor[] {
       ),
     },
     {
-      path: '/admin/featuretoggles',
-      component: config.featureToggles.featureToggleAdminPage
-        ? SafeDynamicImport(
-            () => import(/* webpackChunkName: "AdminFeatureTogglesPage" */ 'app/features/admin/AdminFeatureTogglesPage')
-          )
-        : () => <Navigate replace to="/admin" />,
-    },
-    {
       path: '/admin/stats',
       component: SafeDynamicImport(
         () => import(/* webpackChunkName: "ServerStats" */ 'app/features/admin/ServerStats')
@@ -392,6 +390,7 @@ export function getAppRoutes(): RouteDescriptor[] {
     // LOGIN / SIGNUP
     {
       path: '/login',
+      allowAnonymous: true,
       component: SafeDynamicImport(
         () => import(/* webpackChunkName: "LoginPage" */ 'app/core/components/Login/LoginPage')
       ),
@@ -417,6 +416,7 @@ export function getAppRoutes(): RouteDescriptor[] {
     },
     {
       path: '/signup',
+      allowAnonymous: true,
       component: config.disableUserSignUp
         ? () => <Navigate replace to="/login" />
         : SafeDynamicImport(() => import(/* webpackChunkName "SignupPage"*/ 'app/core/components/Signup/SignupPage')),
@@ -425,6 +425,7 @@ export function getAppRoutes(): RouteDescriptor[] {
     },
     {
       path: '/user/password/send-reset-email',
+      allowAnonymous: true,
       chromeless: true,
       component: SafeDynamicImport(
         () =>
@@ -433,6 +434,7 @@ export function getAppRoutes(): RouteDescriptor[] {
     },
     {
       path: '/user/password/reset',
+      allowAnonymous: true,
       component: SafeDynamicImport(
         () =>
           import(
@@ -481,6 +483,7 @@ export function getAppRoutes(): RouteDescriptor[] {
     },
     {
       path: '/sandbox/test',
+      allowAnonymous: true, // purposefully to allow testing
       component: SafeDynamicImport(
         () => import(/* webpackChunkName: "TestStuffPage"*/ 'app/features/sandbox/TestStuffPage')
       ),
@@ -526,6 +529,24 @@ export function getAppRoutes(): RouteDescriptor[] {
       component: SafeDynamicImport(
         () => import(/* webpackChunkName: "BookmarksPage"*/ 'app/features/bookmarks/BookmarksPage')
       ),
+    },
+    {
+      path: '/theme-playground',
+      component: SafeDynamicImport(
+        () => import(/* webpackChunkName: "ThemePlayground"*/ 'app/features/theme-playground/ThemePlayground')
+      ),
+    },
+    config.featureToggles.restoreDashboards && {
+      path: '/dashboard/recently-deleted',
+      roles: () => ['Admin', 'ServerAdmin'],
+      component: SafeDynamicImport(
+        () => import(/* webpackChunkName: "RecentlyDeletedPage" */ 'app/features/browse-dashboards/RecentlyDeletedPage')
+      ),
+    },
+    {
+      // Redirect the /femt dev page to the root
+      path: '/femt',
+      component: () => <Navigate replace to="/" />,
     },
     ...getPluginCatalogRoutes(),
     ...getSupportBundleRoutes(),

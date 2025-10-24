@@ -1,8 +1,8 @@
 import { groupBy } from 'lodash';
 import { FC, useCallback, useMemo, useState } from 'react';
 
+import { Trans, t } from '@grafana/i18n';
 import { Button, Icon, Modal, ModalProps, Spinner, Stack } from '@grafana/ui';
-import { Trans, t } from 'app/core/internationalization';
 import { AlertState, AlertmanagerGroup, ObjectMatcher, RouteWithID } from 'app/plugins/datasource/alertmanager/types';
 
 import { FormAmRoute } from '../../types/amroutes';
@@ -263,6 +263,7 @@ const useAlertGroupsModal = (
         onDismiss={handleDismiss}
         closeOnBackdropClick={true}
         closeOnEscape={true}
+        ariaLabel={t('alerting.policies.matchers', 'Matchers')}
         title={
           <Stack direction="row" alignItems="center" gap={1} wrap={'wrap'}>
             <Stack direction="row" alignItems="center" gap={0.5}>
@@ -303,6 +304,7 @@ const UpdatingModal: FC<Pick<ModalProps, 'isOpen'>> = ({ isOpen }) => (
     onDismiss={() => {}}
     closeOnBackdropClick={false}
     closeOnEscape={false}
+    ariaLabel={t('alerting.policies.update.updating', 'Updating...')}
     title={
       <Stack direction="row" alignItems="center" gap={0.5}>
         <Trans i18nKey="alerting.policies.update.updating">Updating...</Trans> <Spinner inline />

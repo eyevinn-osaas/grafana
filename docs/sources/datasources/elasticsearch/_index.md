@@ -53,10 +53,15 @@ The following will help you get started working with Elasticsearch and Grafana:
 
 ## Supported Elasticsearch versions
 
+{{< admonition type="warning" >}}
+The Elasticsearch data source plugin currently does not support Elastic Cloud Serverless, or any other serverless variant of Elasticsearch.
+{{< /admonition >}}
+
 This data source supports these versions of Elasticsearch:
 
-- v7.17+
+- ≥ v7.17
 - v8.x
+- v9.x
 
 Our maintenance policy for Elasticsearch data source is aligned with the [Elastic Product End of Life Dates](https://www.elastic.co/support/eol) and we ensure proper functionality for supported versions. If you are using an Elasticsearch with version that is past its end-of-life (EOL), you can still execute queries, but you will receive a notification in the query builder indicating that the version of Elasticsearch you are using is no longer supported. It's important to note that in such cases, we do not guarantee the correctness of the functionality, and we will not be addressing any related issues.
 
@@ -65,11 +70,11 @@ Our maintenance policy for Elasticsearch data source is aligned with the [Elasti
 You can define and configure the data source in YAML files as part of Grafana's provisioning system.
 For more information about provisioning, and for available configuration options, refer to [Provisioning Grafana](ref:provisioning-grafana).
 
-{{% admonition type="note" %}}
+{{< admonition type="note" >}}
 The previously used `database` field has now been [deprecated](https://github.com/grafana/grafana/pull/58647).
 You should now use the `index` field in `jsonData` to store the index name.
 Please see the examples below.
-{{% /admonition %}}
+{{< /admonition >}}
 
 ### Provisioning examples
 

@@ -1,10 +1,11 @@
 import { ReducersMapObject } from '@reduxjs/toolkit';
 import { AnyAction, combineReducers } from 'redux';
 
+import { notificationsAPIv0alpha1, rulesAPIv0alpha1 } from '@grafana/alerting/unstable';
+import { allReducers as allApiClientReducers } from '@grafana/api-clients/rtkq';
 import sharedReducers from 'app/core/reducers';
 import ldapReducers from 'app/features/admin/state/reducers';
 import alertingReducers from 'app/features/alerting/state/reducers';
-import apiKeysReducers from 'app/features/api-keys/state/reducers';
 import authConfigReducers from 'app/features/auth-config/state/reducers';
 import { browseDashboardsAPI } from 'app/features/browse-dashboards/api/browseDashboardsAPI';
 import browseDashboardsReducers from 'app/features/browse-dashboards/state/slice';
@@ -16,7 +17,6 @@ import exploreReducers from 'app/features/explore/state/main';
 import foldersReducers from 'app/features/folders/state/reducers';
 import invitesReducers from 'app/features/invites/state/reducers';
 import importDashboardReducers from 'app/features/manage-dashboards/state/reducers';
-import { cloudMigrationAPI } from 'app/features/migrate-to-cloud/api';
 import organizationReducers from 'app/features/org/state/reducers';
 import panelsReducers from 'app/features/panel/state/reducers';
 import { reducer as pluginsReducer } from 'app/features/plugins/admin/state/reducer';
@@ -27,20 +27,13 @@ import teamsReducers from 'app/features/teams/state/reducers';
 import usersReducers from 'app/features/users/state/reducers';
 import templatingReducers from 'app/features/variables/state/keyedVariablesReducer';
 
-import { advisorAPI } from '../../api/clients/advisor';
-import { folderAPI } from '../../api/clients/folder';
-import { iamAPI } from '../../api/clients/iam';
-import { playlistAPI } from '../../api/clients/playlist';
-import { provisioningAPI } from '../../api/clients/provisioning';
 import { alertingApi } from '../../features/alerting/unified/api/alertingApi';
-import { userPreferencesAPI } from '../../features/preferences/api';
 import { cleanUpAction } from '../actions/cleanUp';
 
 const rootReducers = {
   ...sharedReducers,
   ...alertingReducers,
   ...teamsReducers,
-  ...apiKeysReducers,
   ...foldersReducers,
   ...dashboardReducers,
   ...exploreReducers,
@@ -60,15 +53,11 @@ const rootReducers = {
   ...authConfigReducers,
   plugins: pluginsReducer,
   [alertingApi.reducerPath]: alertingApi.reducer,
+  [notificationsAPIv0alpha1.reducerPath]: notificationsAPIv0alpha1.reducer,
+  [rulesAPIv0alpha1.reducerPath]: rulesAPIv0alpha1.reducer,
   [publicDashboardApi.reducerPath]: publicDashboardApi.reducer,
   [browseDashboardsAPI.reducerPath]: browseDashboardsAPI.reducer,
-  [cloudMigrationAPI.reducerPath]: cloudMigrationAPI.reducer,
-  [iamAPI.reducerPath]: iamAPI.reducer,
-  [playlistAPI.reducerPath]: playlistAPI.reducer,
-  [userPreferencesAPI.reducerPath]: userPreferencesAPI.reducer,
-  [provisioningAPI.reducerPath]: provisioningAPI.reducer,
-  [folderAPI.reducerPath]: folderAPI.reducer,
-  [advisorAPI.reducerPath]: advisorAPI.reducer,
+  ...allApiClientReducers,
 };
 
 const addedReducers = {};

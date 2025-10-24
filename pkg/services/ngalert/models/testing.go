@@ -13,6 +13,9 @@ import (
 	"github.com/go-openapi/strfmt"
 	"github.com/google/uuid"
 	alertingNotify "github.com/grafana/alerting/notify"
+	"github.com/grafana/alerting/notify/notifytest"
+	"github.com/grafana/alerting/receivers/schema"
+	"github.com/grafana/alerting/receivers/webex"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	amv2 "github.com/prometheus/alertmanager/api/v2/models"
 	"github.com/prometheus/alertmanager/pkg/labels"
@@ -128,7 +131,7 @@ func (g *AlertRuleGenerator) Generate() AlertRule {
 		Labels:                      labels,
 		NotificationSettings:        ns,
 		Metadata:                    GenerateMetadata(),
-		MissingSeriesEvalsToResolve: util.Pointer(2),
+		MissingSeriesEvalsToResolve: util.Pointer[int64](2),
 	}
 
 	for _, mutator := range g.mutators {
@@ -314,7 +317,7 @@ func (a *AlertRuleMutators) WithIntervalSeconds(seconds int64) AlertRuleMutator 
 	}
 }
 
-// WithIntervalMatching mutator that generates random interval and `for` duration that are times of the provided base interval.
+// WithIntervalMatching mutator that generates random interval and `for` duration that are multiples of the provided base interval.
 func (a *AlertRuleMutators) WithIntervalMatching(baseInterval time.Duration) AlertRuleMutator {
 	return func(rule *AlertRule) {
 		rule.IntervalSeconds = int64(baseInterval.Seconds()) * (rand.Int63n(10) + 1)
@@ -514,12 +517,12 @@ func (a *AlertRuleMutators) WithSameGroup() AlertRuleMutator {
 	}
 }
 
-func (a *AlertRuleMutators) WithMissingSeriesEvalsToResolve(timesOfInterval int) AlertRuleMutator {
+func (a *AlertRuleMutators) WithMissingSeriesEvalsToResolve(timesOfInterval int64) AlertRuleMutator {
 	return func(rule *AlertRule) {
 		if timesOfInterval <= 0 {
 			panic("timesOfInterval must be greater than 0")
 		}
-		rule.MissingSeriesEvalsToResolve = util.Pointer(timesOfInterval)
+		rule.MissingSeriesEvalsToResolve = util.Pointer[int64](timesOfInterval)
 	}
 }
 
@@ -558,6 +561,14 @@ func (a *AlertRuleMutators) WithRandomRecordingRules() AlertRuleMutator {
 func (a *AlertRuleMutators) WithAllRecordingRules() AlertRuleMutator {
 	return func(rule *AlertRule) {
 		ConvertToRecordingRule(rule)
+	}
+}
+
+func (a *AlertRuleMutators) WithoutTargetDataSource() AlertRuleMutator {
+	return func(rule *AlertRule) {
+		if rule.Record != nil {
+			rule.Record.TargetDatasourceUID = ""
+		}
 	}
 }
 
@@ -925,6 +936,10 @@ func CopyNotificationSettings(ns NotificationSettings, mutators ...Mutator[Notif
 		c.MuteTimeIntervals = make([]string, len(ns.MuteTimeIntervals))
 		copy(c.MuteTimeIntervals, ns.MuteTimeIntervals)
 	}
+	if ns.ActiveTimeIntervals != nil {
+		c.ActiveTimeIntervals = make([]string, len(ns.ActiveTimeIntervals))
+		copy(c.ActiveTimeIntervals, ns.ActiveTimeIntervals)
+	}
 	for _, mutator := range mutators {
 		mutator(&c)
 	}
@@ -935,12 +950,13 @@ func CopyNotificationSettings(ns NotificationSettings, mutators ...Mutator[Notif
 func NotificationSettingsGen(mutators ...Mutator[NotificationSettings]) func() NotificationSettings {
 	return func() NotificationSettings {
 		c := NotificationSettings{
-			Receiver:          util.GenerateShortUID(),
-			GroupBy:           []string{model.AlertNameLabel, FolderTitleLabel, util.GenerateShortUID()},
-			GroupWait:         util.Pointer(model.Duration(time.Duration(rand.Intn(100)+1) * time.Second)),
-			GroupInterval:     util.Pointer(model.Duration(time.Duration(rand.Intn(100)+1) * time.Second)),
-			RepeatInterval:    util.Pointer(model.Duration(time.Duration(rand.Intn(100)+1) * time.Second)),
-			MuteTimeIntervals: []string{util.GenerateShortUID(), util.GenerateShortUID()},
+			Receiver:            util.GenerateShortUID(),
+			GroupBy:             []string{model.AlertNameLabel, FolderTitleLabel, util.GenerateShortUID()},
+			GroupWait:           util.Pointer(model.Duration(time.Duration(rand.Intn(100)+1) * time.Second)),
+			GroupInterval:       util.Pointer(model.Duration(time.Duration(rand.Intn(100)+1) * time.Second)),
+			RepeatInterval:      util.Pointer(model.Duration(time.Duration(rand.Intn(100)+1) * time.Second)),
+			MuteTimeIntervals:   []string{util.GenerateShortUID(), util.GenerateShortUID()},
+			ActiveTimeIntervals: []string{util.GenerateShortUID(), util.GenerateShortUID()},
 		}
 		for _, mutator := range mutators {
 			mutator(&c)
@@ -999,6 +1015,12 @@ func (n NotificationSettingsMutators) WithGroupBy(groupBy ...string) Mutator[Not
 func (n NotificationSettingsMutators) WithMuteTimeIntervals(muteTimeIntervals ...string) Mutator[NotificationSettings] {
 	return func(ns *NotificationSettings) {
 		ns.MuteTimeIntervals = muteTimeIntervals
+	}
+}
+
+func (n NotificationSettingsMutators) WithActiveTimeIntervals(activeTimeIntervals ...string) Mutator[NotificationSettings] {
+	return func(ns *NotificationSettings) {
+		ns.ActiveTimeIntervals = activeTimeIntervals
 	}
 }
 
@@ -1161,6 +1183,7 @@ func ReceiverGen(mutators ...Mutator[Receiver]) func() Receiver {
 			Name:         name,
 			Integrations: []*Integration{&integration},
 			Provenance:   ProvenanceNone,
+			Origin:       ResourceOriginGrafana,
 		}
 		for _, mutator := range mutators {
 			mutator(&c)
@@ -1189,15 +1212,17 @@ func (n ReceiverMutators) WithProvenance(provenance Provenance) Mutator[Receiver
 	}
 }
 
-func (n ReceiverMutators) WithValidIntegration(integrationType string) Mutator[Receiver] {
+func (n ReceiverMutators) WithValidIntegration(integrationType schema.IntegrationType) Mutator[Receiver] {
 	return func(r *Receiver) {
+		// TODO add support for v0
 		integration := IntegrationGen(IntegrationMuts.WithValidConfig(integrationType))()
 		r.Integrations = []*Integration{&integration}
 	}
 }
 
-func (n ReceiverMutators) WithInvalidIntegration(integrationType string) Mutator[Receiver] {
+func (n ReceiverMutators) WithInvalidIntegration(integrationType schema.IntegrationType) Mutator[Receiver] {
 	return func(r *Receiver) {
+		// TODO add support for v0
 		integration := IntegrationGen(IntegrationMuts.WithInvalidConfig(integrationType))()
 		r.Integrations = []*Integration{&integration}
 	}
@@ -1225,6 +1250,12 @@ func (n ReceiverMutators) Decrypted(fn DecryptFn) Mutator[Receiver] {
 	}
 }
 
+func (n ReceiverMutators) WithOrigin(origin ResourceOrigin) Mutator[Receiver] {
+	return func(r *Receiver) {
+		r.Origin = origin
+	}
+}
+
 // Integrations
 
 // CopyIntegrationWith creates a deep copy of Integration and then applies mutators to it.
@@ -1240,7 +1271,7 @@ func CopyIntegrationWith(r Integration, mutators ...Mutator[Integration]) Integr
 func IntegrationGen(mutators ...Mutator[Integration]) func() Integration {
 	return func() Integration {
 		name := util.GenerateShortUID()
-		randomIntegrationType, _ := randomMapKey(alertingNotify.AllKnownConfigsForTesting)
+		randomIntegrationType, _ := randomMapKey(notifytest.AllKnownV1ConfigsForTesting)
 
 		c := Integration{
 			UID:                   util.GenerateShortUID(),
@@ -1284,11 +1315,15 @@ func (n IntegrationMutators) WithName(name string) Mutator[Integration] {
 	}
 }
 
-func (n IntegrationMutators) WithValidConfig(integrationType string) Mutator[Integration] {
+func (n IntegrationMutators) WithValidConfig(integrationType schema.IntegrationType) Mutator[Integration] {
 	return func(c *Integration) {
-		config := alertingNotify.AllKnownConfigsForTesting[integrationType].GetRawNotifierConfig(c.Name)
-		integrationConfig, _ := IntegrationConfigFromType(integrationType)
-		c.Config = integrationConfig
+		// TODO add support for v0 integrations
+		ncfg, ok := notifytest.AllKnownV1ConfigsForTesting[integrationType]
+		if !ok {
+			panic(fmt.Sprintf("unknown integration type: %s", integrationType))
+		}
+		config := ncfg.GetRawNotifierConfig(c.Name)
+		c.Config, _ = alertingNotify.GetSchemaVersionForIntegration(integrationType, schema.V1)
 
 		var settings map[string]any
 		_ = json.Unmarshal(config.Settings, &settings)
@@ -1303,13 +1338,16 @@ func (n IntegrationMutators) WithValidConfig(integrationType string) Mutator[Int
 	}
 }
 
-func (n IntegrationMutators) WithInvalidConfig(integrationType string) Mutator[Integration] {
+func (n IntegrationMutators) WithInvalidConfig(integrationType schema.IntegrationType) Mutator[Integration] {
 	return func(c *Integration) {
-		integrationConfig, _ := IntegrationConfigFromType(integrationType)
-		c.Config = integrationConfig
+		var ok bool
+		c.Config, ok = alertingNotify.GetSchemaVersionForIntegration(integrationType, schema.V1)
+		if !ok {
+			panic(fmt.Sprintf("unknown integration type: %s", integrationType))
+		}
 		c.Settings = map[string]interface{}{}
 		c.SecureSettings = map[string]string{}
-		if integrationType == "webex" {
+		if integrationType == webex.Type {
 			// Webex passes validation without any settings but should fail with an unparsable URL.
 			c.Settings["api_url"] = "(*^$*^%!@#$*()"
 		}
@@ -1363,10 +1401,14 @@ func ConvertToRecordingRule(rule *AlertRule) {
 	if rule.Record.Metric == "" {
 		rule.Record.Metric = fmt.Sprintf("some_metric_%s", util.GenerateShortUID())
 	}
+	if rule.Record.TargetDatasourceUID == "" {
+		rule.Record.TargetDatasourceUID = util.GenerateShortUID()
+	}
 	rule.Condition = ""
 	rule.NoDataState = ""
 	rule.ExecErrState = ""
 	rule.For = 0
+	rule.KeepFiringFor = 0
 	rule.NotificationSettings = nil
 	rule.MissingSeriesEvalsToResolve = nil
 }

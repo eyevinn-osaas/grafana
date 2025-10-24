@@ -417,7 +417,7 @@ func (ss *FolderStoreImpl) GetHeight(ctx context.Context, foldrUID string, orgID
 			ele := queue[0]
 			queue = queue[1:]
 			if parentUID != nil && *parentUID == ele {
-				return 0, folder.ErrCircularReference
+				return 0, folder.ErrCircularReference.Errorf("circular reference detected")
 			}
 			folders, err := ss.GetChildren(ctx, folder.GetChildrenQuery{UID: ele, OrgID: orgID})
 			if err != nil {
@@ -620,7 +620,7 @@ func (ss *FolderStoreImpl) GetDescendants(ctx context.Context, orgID int64, ance
 
 func getFullpathSQL(dialect migrator.Dialect) string {
 	escaped := `\/`
-	if dialect.DriverName() == migrator.MySQL || dialect.DriverName() == migrator.Spanner {
+	if dialect.DriverName() == migrator.MySQL {
 		escaped = `\\/`
 	}
 	concatCols := make([]string, 0, folder.MaxNestedFolderDepth)

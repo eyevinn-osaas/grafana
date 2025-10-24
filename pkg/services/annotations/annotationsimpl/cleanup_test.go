@@ -3,9 +3,11 @@ package annotationsimpl
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -13,12 +15,11 @@ import (
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/services/annotations"
 	"github.com/grafana/grafana/pkg/setting"
+	"github.com/grafana/grafana/pkg/util/testutil"
 )
 
 func TestIntegrationAnnotationCleanUp(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test")
-	}
+	testutil.SkipIntegrationTestInShortMode(t)
 
 	fakeSQL := db.InitTestDB(t)
 
@@ -149,9 +150,7 @@ func TestIntegrationAnnotationCleanUp(t *testing.T) {
 }
 
 func TestIntegrationOldAnnotationsAreDeletedFirst(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test")
-	}
+	testutil.SkipIntegrationTestInShortMode(t)
 
 	fakeSQL := db.InitTestDB(t)
 
@@ -187,7 +186,7 @@ func TestIntegrationOldAnnotationsAreDeletedFirst(t *testing.T) {
 		// run the clean up task to keep one annotation.
 		cfg := setting.NewCfg()
 		cfg.AnnotationCleanupJobBatchSize = 1
-		cleaner := NewXormStore(cfg, log.New("annotation.test"), fakeSQL, nil)
+		cleaner := NewXormStore(cfg, log.New("annotation.test"), fakeSQL, nil, prometheus.NewRegistry())
 		_, err = cleaner.CleanAnnotations(context.Background(), setting.AnnotationCleanupSettings{MaxCount: 1}, alertAnnotationType)
 		require.NoError(t, err)
 
@@ -238,24 +237,27 @@ func createTestAnnotations(t *testing.T, store db.DB, expectedCount int, oldAnno
 	newAnnotationTags := make([]*annotationTag, 0, 2*expectedCount)
 	for i := 0; i < expectedCount; i++ {
 		a := &annotations.Item{
-			ID:          int64(i + 1),
-			DashboardID: 1,
-			OrgID:       1,
-			UserID:      1,
-			PanelID:     1,
-			Text:        "",
+			ID:           int64(i + 1),
+			DashboardID:  1,
+			DashboardUID: "uid" + strconv.Itoa(i),
+			OrgID:        1,
+			UserID:       1,
+			PanelID:      1,
+			Text:         "",
 		}
 
 		// mark every third as an API annotation
 		// that does not belong to a dashboard
 		if i%3 == 1 {
-			a.DashboardID = 0
+			a.DashboardID = 0 // nolint: staticcheck
+			a.DashboardUID = ""
 		}
 
 		// mark every third annotation as an alert annotation
 		if i%3 == 0 {
 			a.AlertID = 10
-			a.DashboardID = 2
+			a.DashboardID = 2 // nolint: staticcheck
+			a.DashboardUID = "dashboard2uid"
 		}
 
 		// create epoch as int annotations.go line 40

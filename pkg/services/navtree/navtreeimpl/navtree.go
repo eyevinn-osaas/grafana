@@ -37,7 +37,6 @@ type ServiceImpl struct {
 	pluginSettings       pluginsettings.Service
 	starService          star.Service
 	features             featuremgmt.FeatureToggles
-	openFeature          *featuremgmt.OpenFeatureService
 	dashboardService     dashboards.DashboardService
 	accesscontrolService ac.Service
 	kvStore              kvstore.KVStore
@@ -60,7 +59,8 @@ type NavigationAppConfig struct {
 
 func ProvideService(cfg *setting.Cfg, accessControl ac.AccessControl, pluginStore pluginstore.Store, pluginSettings pluginsettings.Service, starService star.Service,
 	features featuremgmt.FeatureToggles, dashboardService dashboards.DashboardService, accesscontrolService ac.Service, kvStore kvstore.KVStore, apiKeyService apikey.Service,
-	license licensing.Licensing, authnService authn.Service, openFeature *featuremgmt.OpenFeatureService) navtree.Service {
+	license licensing.Licensing, authnService authn.Service,
+) navtree.Service {
 	service := &ServiceImpl{
 		cfg:                  cfg,
 		log:                  log.New("navtree service"),
@@ -70,7 +70,6 @@ func ProvideService(cfg *setting.Cfg, accessControl ac.AccessControl, pluginStor
 		pluginSettings:       pluginSettings,
 		starService:          starService,
 		features:             features,
-		openFeature:          openFeature,
 		dashboardService:     dashboardService,
 		accesscontrolService: accesscontrolService,
 		kvStore:              kvStore,
@@ -144,7 +143,6 @@ func (s *ServiceImpl) GetNavTree(c *contextmodel.ReqContext, prefs *pref.Prefere
 			Id:         navtree.NavIDDrilldown,
 			SubTitle:   "Drill down into your data using Grafana's powerful queryless apps",
 			Icon:       "drilldown",
-			IsNew:      true,
 			SortWeight: navtree.WeightDrilldown,
 			Url:        s.cfg.AppSubURL + "/drilldown",
 		})
@@ -190,8 +188,9 @@ func (s *ServiceImpl) GetNavTree(c *contextmodel.ReqContext, prefs *pref.Prefere
 		treeRoot.RemoveSectionByID(navtree.NavIDCfg)
 	}
 
-	enabled := s.openFeature.Client.Boolean(ctx, featuremgmt.FlagPinNavItems, true, openfeature.TransactionContext(ctx))
-	if enabled && c.IsSignedIn {
+	flagDetails, err := openfeature.NewDefaultClient().BooleanValueDetails(ctx, featuremgmt.FlagPinNavItems, true, openfeature.TransactionContext(ctx))
+	s.log.Debug("flag evaluation: ", "flagDetails", flagDetails, "err", err)
+	if flagDetails.Value && c.IsSignedIn {
 		treeRoot.AddSection(&navtree.NavLink{
 			Text:           "Bookmarks",
 			Id:             navtree.NavIDBookmarks,
@@ -213,7 +212,7 @@ func (s *ServiceImpl) getHomeNode(c *contextmodel.ReqContext, prefs *pref.Prefer
 	} else {
 		homePage := s.cfg.HomePage
 
-		if prefs.HomeDashboardID == 0 && len(homePage) > 0 {
+		if prefs.HomeDashboardUID == "" && len(homePage) > 0 {
 			homeUrl = homePage
 		}
 	}
@@ -225,17 +224,19 @@ func (s *ServiceImpl) getHomeNode(c *contextmodel.ReqContext, prefs *pref.Prefer
 		Icon:       "home-alt",
 		SortWeight: navtree.WeightHome,
 	}
-	ctx := c.Req.Context()
-	if s.features.IsEnabled(ctx, featuremgmt.FlagHomeSetupGuide) {
-		var children []*navtree.NavLink
-		// setup guide (a submenu item under Home)
-		children = append(children, &navtree.NavLink{
-			Id:         "home-setup-guide",
-			Text:       "Setup guide",
-			Url:        homeUrl + "/setup-guide",
-			SortWeight: navtree.WeightHome,
-		})
-		homeNode.Children = children
+	if c.IsSignedIn && c.HasRole(org.RoleAdmin) {
+		ctx := c.Req.Context()
+		if _, exists := s.pluginStore.Plugin(ctx, "grafana-setupguide-app"); exists {
+			var children []*navtree.NavLink
+			// setup guide (a submenu item under Home)
+			children = append(children, &navtree.NavLink{
+				Id:         "home-setup-guide",
+				Text:       "Getting started guide",
+				Url:        "/a/grafana-setupguide-app/getting-started",
+				SortWeight: navtree.WeightHome,
+			})
+			homeNode.Children = children
+		}
 	}
 	return homeNode
 }
@@ -244,9 +245,9 @@ func isSupportBundlesEnabled(s *ServiceImpl) bool {
 	return s.cfg.SectionWithEnvOverrides("support_bundles").Key("enabled").MustBool(true)
 }
 
+// addHelpLinks adds a help menu item to the navigation bar.
 func (s *ServiceImpl) addHelpLinks(treeRoot *navtree.NavTreeRoot, c *contextmodel.ReqContext) {
 	if s.cfg.HelpEnabled {
-		// The version subtitle is set later by NavTree.ApplyHelpVersion
 		helpNode := &navtree.NavLink{
 			Text:       "Help",
 			Id:         "help",
@@ -258,6 +259,16 @@ func (s *ServiceImpl) addHelpLinks(treeRoot *navtree.NavTreeRoot, c *contextmode
 
 		treeRoot.AddSection(helpNode)
 
+		ctx := c.Req.Context()
+		// The interactive learning plugin ID is transitioning from grafana-grafanadocsplugin-app to grafana-pathfinder-app.
+		// Support both until that migration is complete.
+		_, oldInteractiveLearningPluginInstalled := s.pluginStore.Plugin(ctx, "grafana-grafanadocsplugin-app")
+		_, newInteractiveLearningPluginInstalled := s.pluginStore.Plugin(ctx, "grafana-pathfinder-app")
+		if oldInteractiveLearningPluginInstalled || newInteractiveLearningPluginInstalled {
+			// Add a custom property to indicate this should open the interactive learning plugin if available.
+			helpNode.HideFromTabs = true
+		}
+
 		hasAccess := ac.HasAccess(s.accessControl, c)
 		supportBundleAccess := ac.EvalAny(
 			ac.EvalPermission(supportbundlesimpl.ActionRead),
@@ -268,7 +279,7 @@ func (s *ServiceImpl) addHelpLinks(treeRoot *navtree.NavTreeRoot, c *contextmode
 			supportBundleNode := &navtree.NavLink{
 				Text:       "Support bundles",
 				Id:         "support-bundles",
-				Url:        "/support-bundles",
+				Url:        s.cfg.AppSubURL + "/support-bundles",
 				Icon:       "wrench",
 				SortWeight: navtree.WeightHelp,
 			}
@@ -400,6 +411,15 @@ func (s *ServiceImpl) buildDashboardNavLinks(c *contextmodel.ReqContext) []*navt
 				Icon: "library-panel",
 			})
 		}
+
+		if s.features.IsEnabled(c.Req.Context(), featuremgmt.FlagRestoreDashboards) && (c.GetOrgRole() == org.RoleAdmin || c.IsGrafanaAdmin) {
+			dashboardChildNavs = append(dashboardChildNavs, &navtree.NavLink{
+				Text:     "Recently deleted",
+				SubTitle: "Any items listed here for more than 30 days will be automatically deleted.",
+				Id:       "dashboards/recently-deleted",
+				Url:      s.cfg.AppSubURL + "/dashboard/recently-deleted",
+			})
+		}
 	}
 
 	if hasAccess(ac.EvalPermission(dashboards.ActionDashboardsCreate)) {
@@ -419,6 +439,14 @@ func (s *ServiceImpl) buildDashboardNavLinks(c *contextmodel.ReqContext) []*navt
 func (s *ServiceImpl) buildAlertNavLinks(c *contextmodel.ReqContext) *navtree.NavLink {
 	hasAccess := ac.HasAccess(s.accessControl, c)
 	var alertChildNavs []*navtree.NavLink
+
+	if s.features.IsEnabled(c.Req.Context(), featuremgmt.FlagAlertingTriage) {
+		if hasAccess(ac.EvalAny(ac.EvalPermission(ac.ActionAlertingRuleRead), ac.EvalPermission(ac.ActionAlertingRuleExternalRead))) {
+			alertChildNavs = append(alertChildNavs, &navtree.NavLink{
+				Text: "Triage", SubTitle: "Triage alerts", Id: "alert-triage", Url: s.cfg.AppSubURL + "/alerting/triage", Icon: "medkit",
+			})
+		}
+	}
 
 	if hasAccess(ac.EvalAny(ac.EvalPermission(ac.ActionAlertingRuleRead), ac.EvalPermission(ac.ActionAlertingRuleExternalRead))) {
 		alertChildNavs = append(alertChildNavs, &navtree.NavLink{

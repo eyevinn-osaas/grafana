@@ -3,6 +3,9 @@ import { FC } from 'react';
 
 import { colorManipulator } from '@grafana/data';
 import { useTheme2 } from '@grafana/ui';
+import g8LoginDarkSvg from 'img/g8_login_dark.svg';
+import g8LoginLightSvg from 'img/g8_login_light.svg';
+import grafanaIconSvg from 'img/grafana_icon.svg';
 
 export interface BrandComponentProps {
   className?: string;
@@ -10,7 +13,7 @@ export interface BrandComponentProps {
 }
 
 export const LoginLogo: FC<BrandComponentProps & { logo?: string }> = ({ className, logo }) => {
-  return <img className={className} src={`${logo ? logo : 'public/img/grafana_icon.svg'}`} alt="Grafana" />;
+  return <img className={className} src={`${logo ? logo : grafanaIconSvg}`} alt="Grafana" />;
 };
 
 const LoginBackground: FC<BrandComponentProps> = ({ className, children }) => {
@@ -24,13 +27,16 @@ const LoginBackground: FC<BrandComponentProps> = ({ className, children }) => {
       right: 0,
       bottom: 0,
       top: 0,
-      background: `url(public/img/g8_login_${theme.isDark ? 'dark' : 'light'}.svg)`,
+      background: `url(${theme.isDark ? g8LoginDarkSvg : g8LoginLightSvg})`,
       backgroundPosition: 'top center',
       backgroundSize: 'auto',
       backgroundRepeat: 'no-repeat',
 
       opacity: 0,
-      transition: 'opacity 3s ease-in-out',
+
+      [theme.transitions.handleMotion('no-preference', 'reduce')]: {
+        transition: 'opacity 3s ease-in-out',
+      },
 
       [theme.breakpoints.up('md')]: {
         backgroundPosition: 'center',
@@ -43,7 +49,7 @@ const LoginBackground: FC<BrandComponentProps> = ({ className, children }) => {
 };
 
 const MenuLogo: FC<BrandComponentProps> = ({ className }) => {
-  return <img className={className} src="public/img/grafana_icon.svg" alt="Grafana" />;
+  return <img className={className} src={grafanaIconSvg} alt="Grafana" />;
 };
 
 const LoginBoxBackground = () => {

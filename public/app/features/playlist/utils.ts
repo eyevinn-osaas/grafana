@@ -5,7 +5,7 @@ import { config } from '@grafana/runtime';
 import { getGrafanaDatasource } from 'app/plugins/datasource/grafana/datasource';
 import { GrafanaQuery, GrafanaQueryType } from 'app/plugins/datasource/grafana/types';
 
-import { Playlist } from '../../api/clients/playlist';
+import { Playlist } from '../../api/clients/playlist/v0alpha1';
 import { getGrafanaSearcher } from '../search/service/searcher';
 import { DashboardQueryResult, SearchQuery } from '../search/service/types';
 
@@ -71,6 +71,8 @@ export async function loadDashboards(items: PlaylistItemUI[]): Promise<PlaylistI
 
 export function getDefaultPlaylist(): Playlist {
   return {
+    apiVersion: 'playlist.grafana.app/v0alpha1',
+    kind: 'Playlist',
     spec: {
       items: [],
       interval: '5m',
@@ -88,5 +90,5 @@ export function searchPlaylists(playlists: Playlist[], query?: string): Playlist
     return playlists;
   }
   query = query.toLowerCase();
-  return playlists.filter((v) => v.spec.title.toLowerCase().includes(query!));
+  return playlists.filter((v) => v.spec?.title.toLowerCase().includes(query!));
 }

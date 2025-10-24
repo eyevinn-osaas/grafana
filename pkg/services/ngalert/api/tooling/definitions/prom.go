@@ -180,9 +180,12 @@ type Rule struct {
 	Health    string `json:"health"`
 	LastError string `json:"lastError,omitempty"`
 	// required: true
-	Type           string    `json:"type"`
-	LastEvaluation time.Time `json:"lastEvaluation"`
-	EvaluationTime float64   `json:"evaluationTime"`
+	Type                 string                         `json:"type"`
+	LastEvaluation       time.Time                      `json:"lastEvaluation"`
+	EvaluationTime       float64                        `json:"evaluationTime"`
+	IsPaused             bool                           `json:"isPaused"`
+	NotificationSettings *AlertRuleNotificationSettings `json:"notificationSettings,omitempty"`
+	Provenance           Provenance                     `json:"provenance,omitempty"`
 }
 
 // Alert has info for an alert.

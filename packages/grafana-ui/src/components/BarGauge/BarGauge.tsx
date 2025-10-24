@@ -23,9 +23,9 @@ import {
 import { selectors } from '@grafana/e2e-selectors';
 import { BarGaugeDisplayMode, BarGaugeNamePlacement, BarGaugeValueMode, VizTextDisplayOptions } from '@grafana/schema';
 
-import { Themeable2 } from '../../types';
+import { Themeable2 } from '../../types/theme';
 import { calculateFontSize, measureText } from '../../utils/measureText';
-import { clearButtonStyles } from '../Button';
+import { clearButtonStyles } from '../Button/Button';
 import { FormattedValueDisplay } from '../FormattedValueDisplay/FormattedValueDisplay';
 
 const MIN_VALUE_HEIGHT = 18;
@@ -147,7 +147,6 @@ export class BarGauge extends PureComponent<Props> {
       lcdCellWidth,
       text,
       valueDisplayMode,
-      theme,
       isOverflow,
     } = this.props;
     const { valueHeight, valueWidth, maxBarHeight, maxBarWidth, wrapperWidth, wrapperHeight } =
@@ -195,7 +194,7 @@ export class BarGauge extends PureComponent<Props> {
       const currentValue = minValue + (valueRange / cellCount) * i;
       const cellColor = getCellColor(currentValue, value, display);
       const cellStyles: CSSProperties = {
-        borderRadius: theme.shape.radius.default,
+        borderRadius: '2px',
       };
 
       if (cellColor.isLit) {
@@ -525,7 +524,7 @@ export function getBasicAndGradientStyles(props: Props): BasicAndGradientStyles 
   };
 
   const barStyles: CSSProperties = {
-    borderRadius: theme.shape.radius.default,
+    borderRadius: theme.shape.radius.sm,
     position: 'relative',
   };
 
@@ -533,7 +532,7 @@ export function getBasicAndGradientStyles(props: Props): BasicAndGradientStyles 
     background: theme.colors.background.secondary,
     flexGrow: 1,
     display: 'flex',
-    borderRadius: theme.shape.radius.default,
+    borderRadius: theme.shape.radius.sm,
     position: 'relative',
   };
 
@@ -688,7 +687,7 @@ function getValueStyles(
   const styles: CSSProperties = {
     color,
     height: `${height}px`,
-    width: `${width}px`,
+    maxWidth: `${width}px`,
     display: 'flex',
     alignItems: 'center',
     textWrap: 'nowrap',

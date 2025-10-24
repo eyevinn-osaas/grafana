@@ -5,7 +5,7 @@ import * as React from 'react';
 import { GrafanaTheme2 } from '@grafana/data';
 
 import { useStyles2 } from '../../themes/ThemeContext';
-import { clearButtonStyles } from '../Button';
+import { clearButtonStyles } from '../Button/Button';
 import { Icon } from '../Icon/Icon';
 
 const getStyles = (theme: GrafanaTheme2) => ({
@@ -51,8 +51,14 @@ const getStyles = (theme: GrafanaTheme2) => ({
       top: 0,
       height: '250%',
       position: 'absolute',
-      animation: 'loader 2s cubic-bezier(0.17, 0.67, 0.83, 0.67) 500ms',
-      animationIterationCount: 100,
+      [theme.transitions.handleMotion('no-preference', 'reduce')]: {
+        animation: 'loader 2s cubic-bezier(0.17, 0.67, 0.83, 0.67) 500ms',
+        animationIterationCount: 100,
+      },
+      [theme.transitions.handleMotion('reduce')]: {
+        animationDuration: '10s',
+        animationIterationCount: 20,
+      },
       left: '-25%',
       background: theme.colors.primary.main,
     },

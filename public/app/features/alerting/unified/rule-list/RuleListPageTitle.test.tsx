@@ -1,15 +1,12 @@
-import { render } from 'test/test-utils';
+import { render, testWithFeatureToggles } from 'test/test-utils';
 import { byRole } from 'testing-library-selector';
 
 import { reportInteraction } from '@grafana/runtime';
 
-import { testWithFeatureToggles } from '../test/test-utils';
+import { mockLocalStorage } from '../mocks';
+import { getPreviewToggle, setPreviewToggle } from '../previewToggles';
 
 import { RuleListPageTitle } from './RuleListPageTitle';
-
-// Constants
-const featureTogglesKey = 'grafana.featureToggles';
-const toggleName = 'alertingListViewV2';
 
 jest.mock('@grafana/runtime', () => ({
   ...jest.requireActual('@grafana/runtime'),
@@ -29,32 +26,21 @@ const ui = {
   disableV2Button: byRole('button', { name: 'Go back to the old look' }),
 };
 
+const localStorageMock = mockLocalStorage();
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+  writable: true,
+});
+
 // Helper function for rendering the component
 function renderRuleListPageTitle() {
-  // Mock localStorage
-  const storage = new Map<string, string>();
-  const mockLocalStorage = {
-    getItem: (key: string) => storage.get(key) ?? null,
-    setItem: (key: string, value: string) => storage.set(key, value),
-    clear: () => storage.clear(),
-  };
-
-  Object.defineProperty(window, 'localStorage', {
-    value: mockLocalStorage,
-    writable: true,
-  });
-
-  const view = render(<RuleListPageTitle title="Alert rules" />);
-
-  return {
-    ...view,
-    storage,
-  };
+  return render(<RuleListPageTitle title="Alert rules" />);
 }
 
 describe('RuleListPageTitle', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorageMock.clear();
   });
 
   it('should render the title', () => {
@@ -69,7 +55,7 @@ describe('RuleListPageTitle', () => {
   });
 
   describe('with alertingListViewV2PreviewToggle enabled and alertingListViewV2 disabled', () => {
-    testWithFeatureToggles(['alertingListViewV2PreviewToggle']);
+    testWithFeatureToggles({ enable: ['alertingListViewV2PreviewToggle'] });
 
     it('should show enable v2 button', () => {
       renderRuleListPageTitle();
@@ -79,11 +65,12 @@ describe('RuleListPageTitle', () => {
     });
 
     it('should enable v2 and reload page when clicked on "Try out the new look!" button', async () => {
-      const { user, storage } = renderRuleListPageTitle();
+      const { user } = renderRuleListPageTitle();
 
       await user.click(ui.enableV2Button.get());
 
-      expect(storage.get(featureTogglesKey)).toBe(`${toggleName}=true`);
+      const previewToggle = getPreviewToggle('alertingListViewV2');
+      expect(previewToggle).toBe(true);
       expect(mockReload).toHaveBeenCalled();
     });
 
@@ -97,7 +84,7 @@ describe('RuleListPageTitle', () => {
   });
 
   describe('with alertingListViewV2PreviewToggle enabled and alertingListViewV2 enabled', () => {
-    testWithFeatureToggles(['alertingListViewV2PreviewToggle', 'alertingListViewV2']);
+    testWithFeatureToggles({ enable: ['alertingListViewV2PreviewToggle', 'alertingListViewV2'] });
 
     it('should show disable v2 button', () => {
       renderRuleListPageTitle();
@@ -107,19 +94,18 @@ describe('RuleListPageTitle', () => {
     });
 
     it('should disable v2 and reload page when clicked on "Go back to the old look" button', async () => {
-      const { user, storage } = renderRuleListPageTitle();
-      storage.set(featureTogglesKey, `${toggleName}=true`);
+      setPreviewToggle('alertingListViewV2', true);
+      const { user } = renderRuleListPageTitle();
 
       await user.click(ui.disableV2Button.get());
 
-      // When the toggle is set to undefined, it should be removed from localStorage
-      expect(storage.get(featureTogglesKey)).toBe('');
+      expect(getPreviewToggle('alertingListViewV2')).toBe(false);
       expect(mockReload).toHaveBeenCalled();
     });
 
     it('should report interaction when disabling v2', async () => {
-      const { user, storage } = renderRuleListPageTitle();
-      storage.set(featureTogglesKey, `${toggleName}=true`);
+      setPreviewToggle('alertingListViewV2', true);
+      const { user } = renderRuleListPageTitle();
 
       await user.click(ui.disableV2Button.get());
 
