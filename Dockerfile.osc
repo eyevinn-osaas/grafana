@@ -1,6 +1,7 @@
 FROM grafana/grafana-enterprise
 
 USER root
+RUN apk add --no-cache curl
 COPY osc-entrypoint.sh /usr/local/bin/osc-entrypoint.sh
 RUN chmod +x /usr/local/bin/osc-entrypoint.sh
 USER 472
